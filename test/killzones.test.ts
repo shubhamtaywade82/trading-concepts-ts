@@ -25,7 +25,7 @@ describe('detectKillzones', () => {
       killzones: [{ name: 'London', startUtcMinute: 420, endUtcMinute: 600 }],
     });
 
-    expect(signals).toEqual([{ index: 0, time: candles[0].time, session: 'London' }]);
+    expect(signals).toEqual([{ index: 0, time: candles[0].time, session: 'London', weight: 1 }]);
   });
 
   it('applies the timezone offset before matching windows', () => {
@@ -39,7 +39,17 @@ describe('detectKillzones', () => {
       killzones: [{ name: 'Opening', startUtcMinute: 555, endUtcMinute: 615 }],
     });
 
-    expect(signals).toEqual([{ index: 0, time, session: 'Opening' }]);
+    expect(signals).toEqual([{ index: 0, time, session: 'Opening', weight: 1 }]);
+  });
+
+  it('uses the window weight when provided', () => {
+    const candles = [candle(8 * 60 * MINUTE, 1, 1, 1, 1)];
+    const signals = detectKillzones(candles, {
+      enabled: true,
+      timezoneOffsetMinutes: 0,
+      killzones: [{ name: 'Asian', startUtcMinute: 420, endUtcMinute: 600, weight: 0.5 }],
+    });
+    expect(signals[0].weight).toBe(0.5);
   });
 
   it('supports windows that wrap past midnight', () => {

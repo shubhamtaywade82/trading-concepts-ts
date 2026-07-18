@@ -7,6 +7,7 @@ export function candle(
   low: number,
   close: number,
   volume?: number,
+  delta?: number,
 ): Candle {
-  return { time, open, high, low, close, volume };
+  return { time, open, high, low, close, volume, delta };
 }

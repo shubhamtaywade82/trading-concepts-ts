@@ -33,7 +33,7 @@ export function detectKillzones(candles: Candle[], config: SessionConfig): Killz
     const minute = minuteOfDay(candle.time, config.timezoneOffsetMinutes);
     const window = config.killzones.find((kz) => isWithinWindow(minute, kz.startUtcMinute, kz.endUtcMinute));
     if (window) {
-      signals.push({ index, time: candle.time, session: window.name });
+      signals.push({ index, time: candle.time, session: window.name, weight: window.weight ?? 1 });
     }
   }
 

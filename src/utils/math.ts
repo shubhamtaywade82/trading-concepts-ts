@@ -8,3 +8,7 @@ export function percentDiff(a: number, reference: number): number {
   if (reference === 0) return 0;
   return (Math.abs(a - reference) / Math.abs(reference)) * 100;
 }
+
+export function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}

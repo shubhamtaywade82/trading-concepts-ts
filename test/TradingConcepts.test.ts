@@ -35,6 +35,10 @@ describe('TradingConcepts', () => {
     expect(Array.isArray(result.priceAction)).toBe(true);
     expect(result.signals).toHaveProperty('longs');
     expect(result.signals).toHaveProperty('shorts');
+    expect(Array.isArray(result.inverseFvgs)).toBe(true);
+    expect(Array.isArray(result.liquiditySweepScores)).toBe(true);
+    expect(Array.isArray(result.premiumDiscountZones)).toBe(true);
+    expect(Array.isArray(result.confluenceScores)).toBe(true);
   });
 
   it('caches analysis until candles or config change', () => {
@@ -56,6 +60,22 @@ describe('TradingConcepts', () => {
     expect(tc.analyze().liquidity).toEqual([]);
   });
 
+  it('disables order blocks, price action, premium/discount, and sweep scoring independently', () => {
+    const tc = new TradingConcepts(buildTrendingCandles(), {
+      structure: { swing: { lookback: 1 } },
+      orderBlock: { enabled: false },
+      priceAction: { enabled: false },
+      premiumDiscount: { enabled: false },
+      liquidity: { sweepScore: { enabled: false } },
+    });
+    const result = tc.analyze();
+
+    expect(result.orderBlocks).toEqual([]);
+    expect(result.priceAction).toEqual([]);
+    expect(result.premiumDiscountZones).toEqual([]);
+    expect(result.liquiditySweepScores).toEqual([]);
+  });
+
   it('finds bullish confluence between an unmitigated order block and a matching price-action signal', () => {
     const tc = new TradingConcepts(buildTrendingCandles(), { structure: { swing: { lookback: 1 } } });
     const { signals } = tc.analyze();
@@ -75,10 +95,41 @@ describe('TradingConcepts', () => {
     expect(second.swings.length).toBeGreaterThanOrEqual(0);
   });
 
+  it('computes a confluence score for the same order block found in signals.longs', () => {
+    const tc = new TradingConcepts(buildTrendingCandles(), { structure: { swing: { lookback: 1 } } });
+    const { confluenceScores } = tc.analyze();
+
+    expect(confluenceScores.length).toBeGreaterThan(0);
+    expect(confluenceScores[0]).toHaveProperty('score');
+    expect(confluenceScores[0]).toHaveProperty('breakdown');
+  });
+
+  it('invalidates the cache when HTF context is set and applies it to the HTF bonus', () => {
+    const tc = new TradingConcepts(buildTrendingCandles(), { structure: { swing: { lookback: 1 } } });
+    const first = tc.analyze();
+
+    tc.setHTFContext({
+      orderBlocks: [
+        { index: 0, time: 0, type: 'bullish', top: 20, bottom: 5, mitigated: false, strength: 1 },
+      ],
+    });
+    const second = tc.analyze();
+
+    expect(second).not.toBe(first);
+    const bullishScore = second.confluenceScores.find((s) => s.direction === 'bullish');
+    expect(bullishScore?.breakdown.htf).toBeGreaterThan(0);
+  });
+
   it('builds from a market preset with extra per-symbol overrides', () => {
     const tc = TradingConcepts.withPreset(buildTrendingCandles(), CRYPTO_PRESET, { precision: 2 });
     expect(tc.getConfig().precision).toBe(2);
     expect(tc.getConfig().session.enabled).toBe(false);
     expect(() => tc.analyze()).not.toThrow();
+  });
+
+  it('builds from a market preset with no extra overrides', () => {
+    const tc = TradingConcepts.withPreset(buildTrendingCandles(), CRYPTO_PRESET);
+    expect(tc.getConfig().precision).toBe(8);
+    expect(tc.getConfig().session.enabled).toBe(false);
   });
 });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { detectStructure, findSwingPoints } from '../src/marketStructure';
-import { SwingPoint } from '../src/types';
+import { applyMSSClassification, detectStructure, findSwingPoints } from '../src/marketStructure';
+import { StructureSignal, SwingPoint } from '../src/types';
 import { candle } from './helpers';
 
 describe('findSwingPoints', () => {
@@ -98,5 +98,62 @@ describe('detectStructure', () => {
       { index: 5, time: 5, type: 'BOS', direction: 'bearish', level: 8 },
       { index: 6, time: 6, type: 'CHoCH', direction: 'bullish', level: 15 },
     ]);
+  });
+});
+
+describe('applyMSSClassification', () => {
+  // Baseline candles idx0-3 each have a true range of 1, so the average true
+  // range ending just before idx4 (over atrLookback=3) is 1.
+  const baseline = [
+    candle(0, 10, 10.5, 9.5, 10),
+    candle(1, 10, 10.5, 9.5, 10.2),
+    candle(2, 10.2, 10.7, 9.7, 10.1),
+    candle(3, 10.1, 10.6, 9.6, 10.3),
+  ];
+  const config = { enabled: true, atrLookback: 3, displacementMultiplier: 1.5 };
+
+  it('upgrades a CHoCH to MSS when the breaking candle displaces well beyond the average range', () => {
+    const candles = [...baseline, candle(4, 10.3, 13, 10.2, 12.5)]; // body 2.2 >= 1.5x avg range (1)
+    const structure: StructureSignal[] = [
+      { index: 4, time: 4, type: 'CHoCH', direction: 'bullish', level: 11 },
+    ];
+
+    const result = applyMSSClassification(structure, candles, config);
+
+    expect(result).toEqual([{ index: 4, time: 4, type: 'MSS', direction: 'bullish', level: 11 }]);
+    expect(structure[0].type).toBe('CHoCH'); // input untouched
+  });
+
+  it('leaves a CHoCH as-is when the breaking candle has no real displacement', () => {
+    const candles = [...baseline, candle(4, 10.3, 10.6, 10.2, 10.5)]; // body 0.2, well under threshold
+    const structure: StructureSignal[] = [
+      { index: 4, time: 4, type: 'CHoCH', direction: 'bullish', level: 11 },
+    ];
+
+    const result = applyMSSClassification(structure, candles, config);
+
+    expect(result).toEqual(structure);
+  });
+
+  it('never upgrades a BOS, even with a large displacement candle', () => {
+    const candles = [...baseline, candle(4, 10.3, 13, 10.2, 12.5)];
+    const structure: StructureSignal[] = [
+      { index: 4, time: 4, type: 'BOS', direction: 'bullish', level: 11 },
+    ];
+
+    const result = applyMSSClassification(structure, candles, config);
+
+    expect(result).toEqual(structure);
+  });
+
+  it('returns the input unchanged when MSS classification is disabled', () => {
+    const candles = [...baseline, candle(4, 10.3, 13, 10.2, 12.5)];
+    const structure: StructureSignal[] = [
+      { index: 4, time: 4, type: 'CHoCH', direction: 'bullish', level: 11 },
+    ];
+
+    const result = applyMSSClassification(structure, candles, { ...config, enabled: false });
+
+    expect(result).toBe(structure);
   });
 });

@@ -39,11 +39,34 @@ export const FOREX_PRESET: TradingConceptsConfigOverrides = {
   session: {
     enabled: true,
     timezoneOffsetMinutes: 0,
+    // Weighted per ICT's kill zone hierarchy: London/NY carry full weight,
+    // the Asian session roughly half, reflecting its lower sweep-reversal rate.
     killzones: [
-      { name: 'Asian', startUtcMinute: 0, endUtcMinute: 180 },
-      { name: 'London', startUtcMinute: 420, endUtcMinute: 600 },
-      { name: 'NewYorkAM', startUtcMinute: 720, endUtcMinute: 900 },
-      { name: 'LondonClose', startUtcMinute: 900, endUtcMinute: 1020 },
+      { name: 'Asian', startUtcMinute: 0, endUtcMinute: 180, weight: 0.5 },
+      { name: 'London', startUtcMinute: 420, endUtcMinute: 600, weight: 1 },
+      { name: 'NewYorkAM', startUtcMinute: 720, endUtcMinute: 900, weight: 1 },
+      { name: 'LondonClose', startUtcMinute: 900, endUtcMinute: 1020, weight: 0.8 },
+    ],
+  },
+};
+
+/**
+ * ICT "Silver Bullet" windows: three narrow 1-hour windows (03:00-04:00,
+ * 10:00-11:00, 14:00-15:00 New York time) inside the broader kill zones above,
+ * associated with a higher rate of clean reversals. Layer on top of
+ * `FOREX_PRESET`/`US_EQUITY_PRESET`, e.g.
+ * `createConfig(createConfig(DEFAULT_CONFIG, FOREX_PRESET), SILVER_BULLET_PRESET)`.
+ * Times are in New York (ET) local clock; pass the correct `timezoneOffsetMinutes`
+ * for standard time (UTC-5) vs daylight time (UTC-4) for the dates you're analyzing.
+ */
+export const SILVER_BULLET_PRESET: TradingConceptsConfigOverrides = {
+  session: {
+    enabled: true,
+    timezoneOffsetMinutes: -300,
+    killzones: [
+      { name: 'SilverBulletAM', startUtcMinute: 180, endUtcMinute: 240, weight: 1 },
+      { name: 'SilverBulletLondonClose', startUtcMinute: 600, endUtcMinute: 660, weight: 0.9 },
+      { name: 'SilverBulletPM', startUtcMinute: 840, endUtcMinute: 900, weight: 1 },
     ],
   },
 };
@@ -68,9 +91,9 @@ export const NSE_INDEX_PRESET: TradingConceptsConfigOverrides = {
     // read as local NSE clock time (09:15-15:30 IST == 03:45-10:00 UTC).
     timezoneOffsetMinutes: 330,
     killzones: [
-      { name: 'Opening', startUtcMinute: 555, endUtcMinute: 615 },
-      { name: 'Midday', startUtcMinute: 615, endUtcMinute: 870 },
-      { name: 'Closing', startUtcMinute: 870, endUtcMinute: 930 },
+      { name: 'Opening', startUtcMinute: 555, endUtcMinute: 615, weight: 1 },
+      { name: 'Midday', startUtcMinute: 615, endUtcMinute: 870, weight: 0.5 },
+      { name: 'Closing', startUtcMinute: 870, endUtcMinute: 930, weight: 0.9 },
     ],
   },
 };
@@ -86,9 +109,9 @@ export const US_EQUITY_PRESET: TradingConceptsConfigOverrides = {
     // ET is UTC-5 (standard) / UTC-4 (DST); pass the correct offset for the date range you're analyzing.
     timezoneOffsetMinutes: -300,
     killzones: [
-      { name: 'Open', startUtcMinute: 570, endUtcMinute: 630 },
-      { name: 'Midday', startUtcMinute: 630, endUtcMinute: 900 },
-      { name: 'Close', startUtcMinute: 900, endUtcMinute: 960 },
+      { name: 'Open', startUtcMinute: 570, endUtcMinute: 630, weight: 1 },
+      { name: 'Midday', startUtcMinute: 630, endUtcMinute: 900, weight: 0.5 },
+      { name: 'Close', startUtcMinute: 900, endUtcMinute: 960, weight: 0.9 },
     ],
   },
 };

@@ -3,7 +3,7 @@
  */
 
 import { FVGConfig, OrderBlockConfig } from './config/types';
-import { Candle, FVG, OrderBlock, SwingPoint } from './types';
+import { Candle, FVG, InverseFVG, OrderBlock, SwingPoint } from './types';
 import { average, percentDiff } from './utils/math';
 
 export function findFVGs(candles: Candle[], config: FVGConfig): FVG[] {
@@ -61,6 +61,54 @@ export function findFVGs(candles: Candle[], config: FVGConfig): FVG[] {
   }
 
   return fvgs;
+}
+
+/**
+ * Detects FVGs that price has decisively closed all the way through,
+ * flipping their polarity: a bullish FVG becomes bearish resistance once a
+ * candle *closes* below its bottom, and a bearish FVG becomes bullish support
+ * once a candle closes above its top. This is a stronger condition than
+ * `FVG.mitigated` (a wick touching the near edge) — inversion requires a
+ * close beyond the *far* edge.
+ */
+export function findInverseFVGs(candles: Candle[], fvgs: FVG[]): InverseFVG[] {
+  const inverseFvgs: InverseFVG[] = [];
+
+  for (const fvg of fvgs) {
+    for (let i = fvg.index + 2; i < candles.length; i++) {
+      const c = candles[i];
+
+      if (fvg.type === 'bullish' && c.close < fvg.bottom) {
+        inverseFvgs.push({
+          index: fvg.index,
+          time: fvg.time,
+          type: 'bearish',
+          originalType: 'bullish',
+          top: fvg.top,
+          bottom: fvg.bottom,
+          inversionIndex: i,
+          inversionTime: c.time,
+        });
+        break;
+      }
+
+      if (fvg.type === 'bearish' && c.close > fvg.top) {
+        inverseFvgs.push({
+          index: fvg.index,
+          time: fvg.time,
+          type: 'bullish',
+          originalType: 'bearish',
+          top: fvg.top,
+          bottom: fvg.bottom,
+          inversionIndex: i,
+          inversionTime: c.time,
+        });
+        break;
+      }
+    }
+  }
+
+  return inverseFvgs;
 }
 
 export function findOrderBlocks(

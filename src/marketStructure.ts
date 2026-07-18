@@ -3,7 +3,9 @@
  * Change of Character (CHoCH).
  */
 
+import { MSSConfig } from './config/types';
 import { Candle, StructureSignal, SwingPoint } from './types';
+import { averageRangeBefore } from './utils/range';
 
 export function findSwingPoints(candles: Candle[], lookback = 5): SwingPoint[] {
   const swings: SwingPoint[] = [];
@@ -75,4 +77,35 @@ export function detectStructure(candles: Candle[], swings: SwingPoint[]): Struct
   }
 
   return signals;
+}
+
+/**
+ * Upgrades CHoCH signals to MSS (Market Structure Shift) when the breaking
+ * candle shows displacement: a body significantly larger than the recent
+ * average true range, confirming institutional participation rather than a
+ * marginal break. BOS signals are left as-is — MSS is specifically a
+ * confirmed reversal, not a continuation.
+ *
+ * Purely additive over `detectStructure`'s output; never mutates its input.
+ */
+export function applyMSSClassification(
+  structure: StructureSignal[],
+  candles: Candle[],
+  config: MSSConfig,
+): StructureSignal[] {
+  if (!config.enabled) return structure;
+
+  return structure.map((signal) => {
+    if (signal.type !== 'CHoCH') return signal;
+
+    const candle = candles[signal.index];
+    const bodySize = Math.abs(candle.close - candle.open);
+    const avgRange = averageRangeBefore(candles, signal.index, config.atrLookback);
+
+    if (avgRange > 0 && bodySize >= avgRange * config.displacementMultiplier) {
+      return { ...signal, type: 'MSS' };
+    }
+
+    return signal;
+  });
 }

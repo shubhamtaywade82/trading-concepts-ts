@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_CONFIG } from '../src/config/defaults';
-import { findFVGs, findOrderBlocks } from '../src/smartMoney';
+import { findFVGs, findInverseFVGs, findOrderBlocks } from '../src/smartMoney';
 import { SwingPoint } from '../src/types';
 import { candle } from './helpers';
 
@@ -63,8 +63,68 @@ describe('findFVGs', () => {
       candle(3, 10, 10, 9.9, 9.95),
     ];
 
-    const fvgs = findFVGs(candles, { enabled: true, minGapPercent: 5 });
+    const fvgs = findFVGs(candles, { enabled: true, minGapPercent: 5, inverse: { enabled: true } });
     expect(fvgs).toHaveLength(0);
+  });
+});
+
+describe('findInverseFVGs', () => {
+  it('flips a bullish FVG to bearish once price closes back below its bottom', () => {
+    const candles = [
+      candle(0, 10, 10, 9, 10),
+      candle(1, 11, 11, 10, 10.5),
+      candle(2, 12, 13, 12, 12.5), // bullish FVG @1: top=12, bottom=10
+      candle(3, 10.5, 11, 9.5, 10.2), // wicks into the gap (mitigated) but closes above bottom: no inversion yet
+      candle(4, 9.5, 12.5, 9, 9.5), // closes (9.5) below bottom(10) -> inversion
+    ];
+
+    const fvgs = findFVGs(candles, DEFAULT_CONFIG.fvg);
+    const inverseFvgs = findInverseFVGs(candles, fvgs);
+
+    const bullishInversion = inverseFvgs.find((f) => f.originalType === 'bullish');
+    expect(bullishInversion).toMatchObject({
+      index: 1,
+      type: 'bearish',
+      originalType: 'bullish',
+      top: 12,
+      bottom: 10,
+      inversionIndex: 4,
+    });
+  });
+
+  it('flips a bearish FVG to bullish once price closes back above its top', () => {
+    const candles = [
+      candle(0, 13, 13, 12, 12.5),
+      candle(1, 11, 11, 10, 10.5),
+      candle(2, 9, 9.5, 9, 9.2), // bearish FVG @1: top=12, bottom=9.5
+      candle(3, 9.9, 10.2, 9.7, 9.8), // stays below top: no inversion yet
+      candle(4, 10, 12.5, 9.9, 12.3), // closes (12.3) above top(12) -> inversion
+    ];
+
+    const fvgs = findFVGs(candles, DEFAULT_CONFIG.fvg);
+    const inverseFvgs = findInverseFVGs(candles, fvgs);
+
+    const bearishInversion = inverseFvgs.find((f) => f.originalType === 'bearish');
+    expect(bearishInversion).toMatchObject({
+      index: 1,
+      type: 'bullish',
+      originalType: 'bearish',
+      top: 12,
+      bottom: 9.5,
+      inversionIndex: 4,
+    });
+  });
+
+  it('returns nothing when price never closes through the far edge', () => {
+    const candles = [
+      candle(0, 10, 10, 9, 10),
+      candle(1, 11, 11, 10, 10.5),
+      candle(2, 12, 13, 12, 12.5),
+      candle(3, 10.5, 11, 9.9, 10.2),
+    ];
+
+    const fvgs = findFVGs(candles, DEFAULT_CONFIG.fvg);
+    expect(findInverseFVGs(candles, fvgs)).toEqual([]);
   });
 });
 

@@ -55,6 +55,7 @@
     "example:crypto": "tsx examples/crypto-binance.ts",
     "example:forex": "tsx examples/forex.ts",
     "example:index": "tsx examples/nse-index.ts",
+    "example:backtest": "tsx examples/backtest.ts",
     "typecheck": "tsc --noEmit",
     "prepare": "husky",
     "prepublishOnly": "npm run build"
