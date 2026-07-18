@@ -66,11 +66,7 @@ export interface StructureSignal {
   level: number;
 }
 
-export type PriceActionPattern =
-  | 'bullish_engulfing'
-  | 'bearish_engulfing'
-  | 'hammer'
-  | 'shooting_star';
+export type PriceActionPattern = 'bullish_engulfing' | 'bearish_engulfing' | 'hammer' | 'shooting_star';
 
 export interface PriceActionSignal {
   index: number;

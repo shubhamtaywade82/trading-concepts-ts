@@ -13,11 +13,21 @@ export function detectPriceAction(candles: Candle[], config: PriceActionConfig):
     const prev = candles[i - 1];
     const curr = candles[i];
 
-    if (prev.close < prev.open && curr.close > curr.open && curr.close > prev.open && curr.open < prev.close) {
+    if (
+      prev.close < prev.open &&
+      curr.close > curr.open &&
+      curr.close > prev.open &&
+      curr.open < prev.close
+    ) {
       signals.push({ index: i, time: curr.time, pattern: 'bullish_engulfing', price: curr.close });
     }
 
-    if (prev.close > prev.open && curr.close < curr.open && curr.close < prev.open && curr.open > prev.close) {
+    if (
+      prev.close > prev.open &&
+      curr.close < curr.open &&
+      curr.close < prev.open &&
+      curr.open > prev.close
+    ) {
       signals.push({ index: i, time: curr.time, pattern: 'bearish_engulfing', price: curr.close });
     }
 

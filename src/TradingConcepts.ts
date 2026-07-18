@@ -73,8 +73,12 @@ export class TradingConcepts {
     const orderBlocks = this.config.orderBlock.enabled
       ? findOrderBlocks(this.candles, swings, this.config.orderBlock)
       : [];
-    const liquidity = this.config.liquidity.enabled ? findLiquidityZones(this.candles, this.config.liquidity) : [];
-    const priceAction = this.config.priceAction.enabled ? detectPriceAction(this.candles, this.config.priceAction) : [];
+    const liquidity = this.config.liquidity.enabled
+      ? findLiquidityZones(this.candles, this.config.liquidity)
+      : [];
+    const priceAction = this.config.priceAction.enabled
+      ? detectPriceAction(this.candles, this.config.priceAction)
+      : [];
     const killzones = detectKillzones(this.candles, this.config.session);
 
     const longs = [

@@ -75,4 +75,28 @@ describe('detectStructure', () => {
     expect(structure).toHaveLength(1);
     expect(structure[0].index).toBe(2);
   });
+
+  it('emits a bearish BOS first, then a bullish CHoCH on the reversal', () => {
+    const candles = [
+      candle(0, 10, 10, 9, 10),
+      candle(1, 10, 11, 10, 10.5),
+      candle(2, 10.5, 11, 10, 10.5),
+      candle(3, 10.5, 11, 9, 9.5),
+      candle(4, 9.5, 10, 8, 8.5),
+      candle(5, 8.5, 8.5, 7, 7), // closes below the swing low (8) -> bearish BOS (trend was null)
+      candle(6, 7, 16, 6.5, 16), // closes above the swing high (15) -> bullish CHoCH (trend was bearish)
+    ];
+
+    const swings: SwingPoint[] = [
+      { index: 1, time: 1, price: 15, type: 'high' },
+      { index: 3, time: 3, price: 8, type: 'low' },
+    ];
+
+    const structure = detectStructure(candles, swings);
+
+    expect(structure).toEqual([
+      { index: 5, time: 5, type: 'BOS', direction: 'bearish', level: 8 },
+      { index: 6, time: 6, type: 'CHoCH', direction: 'bullish', level: 15 },
+    ]);
+  });
 });

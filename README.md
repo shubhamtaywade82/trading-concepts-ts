@@ -1,5 +1,10 @@
 # trading-concepts-ts
 
+[![CI](https://github.com/shubhamtaywade82/trading-concepts-ts/actions/workflows/ci.yml/badge.svg)](https://github.com/shubhamtaywade82/trading-concepts-ts/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/shubhamtaywade82/trading-concepts-ts/actions/workflows/codeql.yml/badge.svg)](https://github.com/shubhamtaywade82/trading-concepts-ts/actions/workflows/codeql.yml)
+[![Security](https://github.com/shubhamtaywade82/trading-concepts-ts/actions/workflows/security.yml/badge.svg)](https://github.com/shubhamtaywade82/trading-concepts-ts/actions/workflows/security.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
+
 A framework-agnostic TypeScript library that unifies **Smart Money Concepts (SMC)**,
 **ICT (Inner Circle Trader)**, and classic **Price Action** into one configurable
 analysis engine.
@@ -76,7 +81,13 @@ deeply on top of sensible defaults (`DEFAULT_CONFIG`) or a market preset.
 ### Using a built-in preset
 
 ```typescript
-import { TradingConcepts, CRYPTO_PRESET, FOREX_PRESET, NSE_INDEX_PRESET, US_EQUITY_PRESET } from 'trading-concepts-ts';
+import {
+  TradingConcepts,
+  CRYPTO_PRESET,
+  FOREX_PRESET,
+  NSE_INDEX_PRESET,
+  US_EQUITY_PRESET,
+} from 'trading-concepts-ts';
 
 // 24/7 crypto perp, no fixed sessions, then fine-tuned per symbol
 const btc = TradingConcepts.withPreset(candles, CRYPTO_PRESET, {
@@ -135,7 +146,11 @@ See `src/config/types.ts` for the full list of tunable fields, and
 ```typescript
 class TradingConcepts {
   constructor(candles: Candle[], configOverrides?: TradingConceptsConfigOverrides);
-  static withPreset(candles: Candle[], preset: TradingConceptsConfigOverrides, extraOverrides?: TradingConceptsConfigOverrides): TradingConcepts;
+  static withPreset(
+    candles: Candle[],
+    preset: TradingConceptsConfigOverrides,
+    extraOverrides?: TradingConceptsConfigOverrides,
+  ): TradingConcepts;
 
   getConfig(): TradingConceptsConfig;
   updateConfig(overrides: TradingConceptsConfigOverrides): void;
@@ -152,7 +167,15 @@ class TradingConcepts {
 Every detector is also exported standalone for tree-shaken, à la carte usage:
 
 ```typescript
-import { findSwingPoints, detectStructure, findFVGs, findOrderBlocks, findLiquidityZones, detectPriceAction, detectKillzones } from 'trading-concepts-ts';
+import {
+  findSwingPoints,
+  detectStructure,
+  findFVGs,
+  findOrderBlocks,
+  findLiquidityZones,
+  detectPriceAction,
+  detectKillzones,
+} from 'trading-concepts-ts';
 ```
 
 ## Using it as an external library / plugin
@@ -172,13 +195,55 @@ import { findSwingPoints, detectStructure, findFVGs, findOrderBlocks, findLiquid
 ## Development
 
 ```bash
-npm install
-npm run build       # emits dist/ (ESM + CJS + .d.ts) via tsup
-npm test            # vitest
+npm install                # also wires up husky git hooks (prepare script)
+npm run build               # emits dist/ (ESM + CJS + .d.ts) via tsup
+npm test                    # vitest
+npm run test:coverage       # vitest with coverage thresholds enforced
 npm run typecheck
-npm run lint
-npm run example:crypto   # or example:forex / example:index
+npm run lint                # eslint src test
+npm run lint:fix
+npm run format               # prettier --write .
+npm run format:check
+npm run audit                # audit-ci: fails on high/critical prod-dep advisories
+npm run example:crypto       # or example:forex / example:index
 ```
+
+### Commit convention & pre-commit hooks
+
+Commits follow [Conventional Commits](https://www.conventionalcommits.org/)
+(`feat:`, `fix:`, `docs:`, `chore:`, ...), enforced locally by a `commit-msg`
+hook (commitlint) and on PRs by the "PR title" workflow. A `pre-commit` hook
+runs `lint-staged` (ESLint + Prettier) on staged files. Hooks are installed
+automatically by `npm install` via the `prepare` script.
+
+## CI/CD & security
+
+Everything below runs in GitHub Actions on every push/PR to `main` (see
+`.github/workflows/`):
+
+| Workflow       | What it checks                                                                                                                                                                                       |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ci.yml`       | Prettier format check, ESLint, `tsc --noEmit`, Vitest (Node 18/20/22 matrix) with coverage thresholds, package build + export-resolution verification, and a smoke test of all three examples        |
+| `codeql.yml`   | GitHub CodeQL static analysis (`security-and-quality` query pack), on push/PR and weekly                                                                                                             |
+| `security.yml` | `audit-ci` (fails on high/critical advisories in production dependencies), Dependency Review on PRs, production-dependency license allowlist check, and a Gitleaks secret scan over full git history |
+| `pr-title.yml` | Enforces a Conventional Commits PR title                                                                                                                                                             |
+| `release.yml`  | On a `vX.Y.Z` tag push: lint/typecheck/test/build, verifies the tag matches `package.json`, publishes to npm with provenance, and creates a GitHub release                                           |
+
+Dependabot (`.github/dependabot.yml`) opens weekly PRs for both npm and
+GitHub Actions dependencies.
+
+### Cutting a release
+
+```bash
+npm version patch   # or minor / major — updates package.json and tags
+git push origin main --tags
+```
+
+Pushing the resulting `vX.Y.Z` tag triggers `release.yml`, which publishes to
+npm (requires an `NPM_TOKEN` repository secret with publish rights) and opens
+a GitHub release with auto-generated notes.
+
+See [SECURITY.md](./SECURITY.md) for how to report a vulnerability.
 
 ## Project layout
 

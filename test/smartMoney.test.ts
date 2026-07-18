@@ -40,6 +40,21 @@ describe('findFVGs', () => {
     expect(fvgs[0]).toMatchObject({ type: 'bearish', top: 12, bottom: 9.5, mitigated: false });
   });
 
+  it('mitigates a bearish FVG once price trades back up into it', () => {
+    const candles = [
+      candle(0, 13, 13, 12, 12.5),
+      candle(1, 11, 11, 10, 10.5),
+      candle(2, 9, 9.5, 9, 9.2), // bearish gap: top=12, bottom=9.5
+      candle(3, 9.9, 10.2, 9.7, 9.8), // stays below top, no mitigation yet
+      candle(4, 10, 12.5, 9, 12.2), // high(12.5) >= top(12) -> mitigated; low(9) avoids a spurious bullish gap
+    ];
+
+    const fvgs = findFVGs(candles, DEFAULT_CONFIG.fvg);
+
+    expect(fvgs).toHaveLength(1);
+    expect(fvgs[0]).toMatchObject({ type: 'bearish', mitigated: true, mitigationIndex: 4 });
+  });
+
   it('filters out gaps smaller than minGapPercent', () => {
     const candles = [
       candle(0, 10, 10, 9.999, 10),

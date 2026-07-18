@@ -34,7 +34,17 @@ console.log('Candles per killzone session:', sessionCounts);
 
 // Fine-tune further for a JPY pair (2-3 decimals instead of 4-5) without
 // rebuilding the whole config from scratch:
-const usdjpy = TradingConcepts.withPreset(candles.map((c) => ({ ...c, open: c.open * 100, high: c.high * 100, low: c.low * 100, close: c.close * 100 })), FOREX_PRESET, {
-  precision: 3,
-});
+const usdjpy = TradingConcepts.withPreset(
+  candles.map((c) => ({
+    ...c,
+    open: c.open * 100,
+    high: c.high * 100,
+    low: c.low * 100,
+    close: c.close * 100,
+  })),
+  FOREX_PRESET,
+  {
+    precision: 3,
+  },
+);
 console.log('USDJPY precision:', usdjpy.getConfig().precision);

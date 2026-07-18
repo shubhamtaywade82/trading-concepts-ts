@@ -43,4 +43,28 @@ describe('findLiquidityZones', () => {
     const zones = findLiquidityZones(candles, { ...DEFAULT_CONFIG.liquidity, equalTolerancePercent: 0.2 });
     expect(zones.filter((z) => z.type === 'buyside')).toHaveLength(0);
   });
+
+  it('detects sellside liquidity from near-equal pivot lows and flags a sweep', () => {
+    const candles = [
+      candle(0, 12, 12, 11, 12),
+      candle(1, 11, 11, 10.5, 10.8),
+      candle(2, 11, 11.5, 9, 9.5), // pivot low #1: 9
+      candle(3, 10, 11, 10, 10.5),
+      candle(4, 10.5, 11, 10.5, 10.8),
+      candle(5, 11, 11.5, 8.985, 9.5), // pivot low #2: 8.985 (~0.17% from 9)
+      candle(6, 10, 11, 10, 10.5),
+      candle(7, 10.5, 11, 10.5, 10.8),
+      candle(8, 9, 9, 7, 8), // sweeps the pool
+      candle(9, 10, 11, 10, 10.5),
+      candle(10, 10.5, 11, 10.5, 10.8),
+    ];
+
+    const zones = findLiquidityZones(candles, { ...DEFAULT_CONFIG.liquidity, equalTolerancePercent: 0.2 });
+
+    const sellside = zones.filter((z) => z.type === 'sellside');
+    expect(sellside).toHaveLength(1);
+    expect(sellside[0].level).toBeCloseTo(8.985);
+    expect(sellside[0].swept).toBe(true);
+    expect(sellside[0].sweepIndex).toBe(8);
+  });
 });

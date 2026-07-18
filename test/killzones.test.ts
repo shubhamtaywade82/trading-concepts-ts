@@ -53,7 +53,10 @@ describe('detectKillzones', () => {
       killzones: [{ name: 'Overnight', startUtcMinute: 1380, endUtcMinute: 60 }],
     };
 
-    const signals = detectKillzones([candle(lateNight, 1, 1, 1, 1), candle(earlyMorning, 1, 1, 1, 1), candle(midday, 1, 1, 1, 1)], config);
+    const signals = detectKillzones(
+      [candle(lateNight, 1, 1, 1, 1), candle(earlyMorning, 1, 1, 1, 1), candle(midday, 1, 1, 1, 1)],
+      config,
+    );
 
     expect(signals.map((s) => s.time)).toEqual([lateNight, earlyMorning]);
   });
