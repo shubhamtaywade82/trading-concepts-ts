@@ -58,6 +58,7 @@
     "example:backtest": "tsx examples/backtest.ts",
     "example:killzone-polarity-shift": "tsx examples/killzone-polarity-shift.ts",
     "example:htf-accumulation-expansion": "tsx examples/htf-accumulation-expansion.ts",
+    "example:llm-context": "tsx examples/llm-context.ts",
     "typecheck": "tsc --noEmit",
     "prepare": "husky",
     "prepublishOnly": "npm run build"

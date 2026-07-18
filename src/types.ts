@@ -342,3 +342,48 @@ export interface OpenInterestConfirmation {
 
 /** Which side is crowded, per funding-rate sign/magnitude — the crowded side is the one more likely to get swept. */
 export type FundingSkew = 'longs_crowded' | 'shorts_crowded' | 'neutral';
+
+/**
+ * A semantic, LLM-ready summary of an analysis — see `buildLLMContext`. Pure
+ * data translation: it formats pieces you've already computed/selected into
+ * this shape, it does not decide which zone/signal is "the" one to report.
+ */
+export interface LLMContext {
+  symbol?: string;
+  /** ISO 8601 timestamp. */
+  timestamp: string;
+  htf_context: {
+    timeframe: string;
+    trend: string;
+    draw_on_liquidity: string;
+    premium_discount: string;
+    volume_profile?: string;
+  };
+  mtf_poi: {
+    timeframe: string;
+    zone_type: string;
+    zone_range: string;
+    status: string;
+    volume_confirmation: string;
+  } | null;
+  ltf_trigger: {
+    timeframe: string;
+    event: string;
+    swept_level: string;
+    reclaim: string;
+    cvd_reaction?: string;
+    structure_shift: string;
+  } | null;
+  confluence?: {
+    score: number;
+    highConviction: boolean;
+    breakdown: ConfluenceScoreBreakdown;
+  };
+  checklist?: {
+    points: number;
+    maxPoints: number;
+    valid: boolean;
+    aPlusSetup: boolean;
+    breakdown: ChecklistBreakdown;
+  };
+}

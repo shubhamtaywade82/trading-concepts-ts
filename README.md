@@ -48,6 +48,9 @@ git submodule/plugin.
   consuming project feed in data this library can't derive from OHLCV alone
   (see
   [Supplying data this library can't compute](#supplying-data-this-library-cant-compute))
+- **LLM-ready output** — `buildLLMContext` formats an analysis into the
+  structured JSON payload an LLM-based reasoning agent would read, without
+  this library taking on any LLM/vector-DB/agent-framework dependencies itself
 
 ## Install
 
@@ -158,8 +161,8 @@ Both calls invalidate the internal cache so the next `.analyze()` recomputes
 from scratch; nothing recomputes until you call `.analyze()`.
 
 See `src/config/types.ts` for the full list of tunable fields, and
-`examples/` for six complete, runnable setups (crypto, forex, NSE index,
-backtest, and two multi-timeframe strategy demos).
+`examples/` for seven complete, runnable setups (crypto, forex, NSE index,
+backtest, two multi-timeframe strategy demos, and the LLM context serializer).
 
 ## The 7-pillar confluence framework
 
@@ -498,6 +501,57 @@ const skew = classifyFundingSkew(latestFundingRate); // 'longs_crowded' | 'short
 // liquidate them) is more probable than the reverse
 ```
 
+## Feeding an LLM reasoning system
+
+If you're building an LLM-based reasoning layer on top of this library — an
+agent that reads market state and reasons through a trade thesis in natural
+language — `buildLLMContext` is the "data translation" half of that: it turns
+analysis pieces you've already computed into the kind of structured JSON an
+LLM prompt would include, instead of you hand-writing that formatting every
+time.
+
+```typescript
+import { TradingConcepts, buildLLMContext, deriveTrendFromStructure } from 'trading-concepts-ts';
+
+const htfAnalysis = new TradingConcepts(dailyCandles).analyze();
+const trend = deriveTrendFromStructure(htfAnalysis.structure); // one reasonable default; define your own if you prefer
+
+const context = buildLLMContext({
+  symbol: 'ETHUSDT',
+  htf: {
+    timeframe: '1D',
+    trend,
+    currentPrice: dailyCandles.at(-1)!.close,
+    drawOnLiquidity: htfAnalysis.liquidity.find((z) => z.type === 'buyside' && !z.swept),
+    premiumDiscountZone: htfAnalysis.premiumDiscountZones.at(-1),
+  },
+  mtfPoi: mtfOrderBlock ? { timeframe: '1H', orderBlock: mtfOrderBlock } : undefined,
+  ltfTrigger: ltfSweep ? { timeframe: '15m', sweptZone: ltfSweep, structureShift: ltfChoch } : undefined,
+  confluenceScore, // from scoreConfluence, if you computed one for the POI
+});
+
+// { symbol, timestamp, htf_context: {...}, mtf_poi: {...} | null, ltf_trigger: {...} | null, confluence?, checklist? }
+const prompt = `Market state:\n${JSON.stringify(context, null, 2)}\n\nWhat's your read?`;
+```
+
+Like `scoreConfluence`/`scoreChecklist`, `buildLLMContext` is a **pure
+formatter** — it doesn't decide which order block is "the" POI or which sweep
+is "the" trigger; you select those (`examples/llm-context.ts` and the two
+multi-timeframe examples show the "most recent qualifying" pattern) and hand
+them in. `deriveTrendFromStructure` is one reasonable default for "trend" —
+pass your own if your strategy defines it differently.
+
+**What this library deliberately doesn't do**: call an LLM, orchestrate
+multiple "agent" prompts, run a RAG pipeline over a vector database, hold a
+conversation loop, or place trades. Those need real dependencies — an
+LLM SDK (OpenAI/Anthropic/etc.), a vector DB client, an exchange execution
+client — that would turn a zero-runtime-dependency, environment-agnostic
+computation library (works identically in Node, a browser, a serverless
+function) into an opinionated application framework tied to specific
+vendors. That layer belongs in the application that imports this library,
+built with whatever LLM/agent tooling you already use — this library's job
+ends at handing you a well-structured payload to reason over.
+
 ## Backtesting
 
 The framework doc this library was built from includes illustrative win-rate/
@@ -591,6 +645,8 @@ import {
   calculateVolumeProfile,
   confirmStructureWithOpenInterest,
   classifyFundingSkew,
+  buildLLMContext,
+  deriveTrendFromStructure,
 } from 'trading-concepts-ts';
 ```
 
@@ -622,7 +678,8 @@ npm run format               # prettier --write .
 npm run format:check
 npm run audit                # audit-ci: fails on high/critical prod-dep advisories
 npm run example:crypto       # or example:forex / example:index / example:backtest /
-                              # example:killzone-polarity-shift / example:htf-accumulation-expansion
+                              # example:killzone-polarity-shift / example:htf-accumulation-expansion /
+                              # example:llm-context
 ```
 
 ### Commit convention & pre-commit hooks
@@ -679,11 +736,13 @@ src/
   checklistScore.ts                 the independent 8-point binary checklist scorer
   indicators/                       standalone ATR/Keltner, Bollinger/TTM squeeze, VWAP,
                                      Volume Profile, and OI/funding-rate helpers
+  llmContext.ts                     buildLLMContext: pure formatter for an LLM-ready JSON payload
   TradingConcepts.ts               main class: wiring + both scoring systems + HTF context
   index.ts                         public exports
 test/                              vitest unit tests per module
 examples/                          runnable fine-tuning examples (crypto/forex/index), a backtest
-                                    harness, and two multi-timeframe (HTF/MTF/LTF) strategy demos
+                                    harness, two multi-timeframe (HTF/MTF/LTF) strategy demos, and
+                                    the LLM context serializer
 ```
 
 ## Disclaimer
