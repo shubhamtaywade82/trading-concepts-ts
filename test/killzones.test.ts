@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { detectKillzones } from '../src/ict/killzones';
+import { detectKillzones, getActiveWindowProgress } from '../src/ict/killzones';
 import { candle } from './helpers';
 
 const MINUTE = 60_000;
@@ -69,5 +69,39 @@ describe('detectKillzones', () => {
     );
 
     expect(signals.map((s) => s.time)).toEqual([lateNight, earlyMorning]);
+  });
+});
+
+describe('getActiveWindowProgress', () => {
+  const config = {
+    enabled: true,
+    timezoneOffsetMinutes: 0,
+    killzones: [{ name: 'London', startUtcMinute: 420, endUtcMinute: 600, weight: 1 }],
+  };
+
+  it('returns null when sessions are disabled', () => {
+    expect(getActiveWindowProgress(8 * 60 * MINUTE, { ...config, enabled: false })).toBeNull();
+  });
+
+  it('returns null when no window matches', () => {
+    expect(getActiveWindowProgress(11 * 60 * MINUTE, config)).toBeNull();
+  });
+
+  it('reports minutes elapsed since the window started', () => {
+    // 07:20 UTC is 20 minutes into the 07:00-10:00 London window
+    const progress = getActiveWindowProgress((7 * 60 + 20) * MINUTE, config);
+    expect(progress).toEqual({ name: 'London', weight: 1, minutesIntoWindow: 20 });
+  });
+
+  it('computes progress correctly for a window that wraps past midnight', () => {
+    const wrapConfig = {
+      enabled: true,
+      timezoneOffsetMinutes: 0,
+      killzones: [{ name: 'Overnight', startUtcMinute: 1380, endUtcMinute: 60, weight: 1 }], // 23:00-01:00
+    };
+
+    // 00:30 is 90 minutes after the 23:00 start
+    const progress = getActiveWindowProgress(30 * MINUTE, wrapConfig);
+    expect(progress).toEqual({ name: 'Overnight', weight: 1, minutesIntoWindow: 90 });
   });
 });

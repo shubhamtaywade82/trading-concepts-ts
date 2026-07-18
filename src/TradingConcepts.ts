@@ -9,11 +9,12 @@ import { DEFAULT_CONFIG } from './config/defaults';
 import { TradingConceptsConfig, TradingConceptsConfigOverrides } from './config/types';
 import { ConfluenceScoreInputs, scoreConfluence } from './confluenceScore';
 import { detectKillzones } from './ict/killzones';
+import { findJudasSwings } from './ict/judasSwing';
 import { computePremiumDiscountZones, findDealingRanges } from './ict/premiumDiscount';
 import { findLiquidityZones, scoreLiquiditySweep } from './liquidity';
 import { applyMSSClassification, detectStructure, findSwingPoints } from './marketStructure';
 import { detectPriceAction } from './priceAction';
-import { findFVGs, findInverseFVGs, findOrderBlocks } from './smartMoney';
+import { findBreakerBlocks, findFVGs, findInverseFVGs, findOrderBlocks } from './smartMoney';
 import {
   AnalysisResult,
   Candle,
@@ -94,6 +95,10 @@ export class TradingConcepts {
     const orderBlocks = this.config.orderBlock.enabled
       ? findOrderBlocks(this.candles, swings, this.config.orderBlock)
       : [];
+    const breakerBlocks =
+      this.config.orderBlock.enabled && this.config.orderBlock.breaker.enabled
+        ? findBreakerBlocks(this.candles, orderBlocks)
+        : [];
 
     const liquidity = this.config.liquidity.enabled
       ? findLiquidityZones(this.candles, this.config.liquidity)
@@ -104,6 +109,10 @@ export class TradingConcepts {
       : [];
 
     const killzones = detectKillzones(this.candles, this.config.session);
+
+    const judasSwings = this.config.judasSwing.enabled
+      ? findJudasSwings(this.candles, liquidity, this.config.session, this.config.judasSwing)
+      : [];
 
     const premiumDiscountZones = this.config.premiumDiscount.enabled
       ? computePremiumDiscountZones(findDealingRanges(swings), this.config.premiumDiscount)
@@ -149,8 +158,10 @@ export class TradingConcepts {
       fvgs,
       inverseFvgs,
       orderBlocks,
+      breakerBlocks,
       liquidity,
       liquiditySweepScores,
+      judasSwings,
       priceAction,
       killzones,
       premiumDiscountZones,

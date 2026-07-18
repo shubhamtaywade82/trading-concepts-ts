@@ -39,6 +39,31 @@ describe('TradingConcepts', () => {
     expect(Array.isArray(result.liquiditySweepScores)).toBe(true);
     expect(Array.isArray(result.premiumDiscountZones)).toBe(true);
     expect(Array.isArray(result.confluenceScores)).toBe(true);
+    expect(Array.isArray(result.breakerBlocks)).toBe(true);
+    expect(Array.isArray(result.judasSwings)).toBe(true);
+  });
+
+  it('detects a breaker block once a mitigated order block is decisively closed through', () => {
+    const candles = [
+      ...buildTrendingCandles(),
+      candle(8, 9.5, 9.5, 7, 7.5), // closes well below the bullish OB @1 bottom (8.0) -> breaker
+    ];
+    const tc = new TradingConcepts(candles, { structure: { swing: { lookback: 1 } } });
+    const { breakerBlocks } = tc.analyze();
+
+    expect(breakerBlocks.some((b) => b.originalType === 'bullish' && b.type === 'bearish')).toBe(true);
+  });
+
+  it('disables breaker blocks and Judas Swings independently via config', () => {
+    const tc = new TradingConcepts(buildTrendingCandles(), {
+      structure: { swing: { lookback: 1 } },
+      orderBlock: { breaker: { enabled: false } },
+      judasSwing: { enabled: false },
+    });
+    const result = tc.analyze();
+
+    expect(result.breakerBlocks).toEqual([]);
+    expect(result.judasSwings).toEqual([]);
   });
 
   it('caches analysis until candles or config change', () => {

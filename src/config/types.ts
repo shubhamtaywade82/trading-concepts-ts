@@ -34,6 +34,10 @@ export interface OrderBlockConfig {
   minVolumeStrength: number;
   /** When true, blocks are discarded if volume data is unavailable instead of defaulting to a pass. */
   requireVolume: boolean;
+  /** Detect Breaker Blocks (order blocks price has closed all the way through, flipping polarity). */
+  breaker: {
+    enabled: boolean;
+  };
 }
 
 export interface LiquiditySweepScoreWeights {
@@ -74,6 +78,12 @@ export interface SessionConfig {
    */
   timezoneOffsetMinutes: number;
   killzones: KillzoneWindow[];
+}
+
+export interface JudasSwingConfig {
+  enabled: boolean;
+  /** How many minutes into a kill zone window still count as the "opening" period a Judas Swing can occur in. */
+  openingWindowMinutes: number;
 }
 
 export interface PriceActionConfig {
@@ -126,6 +136,23 @@ export interface TradingConceptsConfig {
   confluence: ConfluenceConfig;
   premiumDiscount: PremiumDiscountConfig;
   confluenceScore: ConfluenceScoreConfig;
+  judasSwing: JudasSwingConfig;
+}
+
+/**
+ * Config for the standalone 8-point binary checklist scorer (`scoreChecklist`).
+ * Independent of `TradingConceptsConfig` / `confluenceScore` — the two
+ * scoring systems don't share weights or state.
+ */
+export interface ChecklistScoreConfig {
+  /** Points (0-8) at or above which a setup is considered valid. */
+  validThreshold: number;
+  /** Points (0-8) at or above which a setup is flagged an "A+" setup. */
+  aPlusThreshold: number;
+  /** Bars around a zone searched for supporting structure/liquidity/session/price-action signals. */
+  lookaroundBars: number;
+  /** Minimum order-block volume strength (relative to its recent average) to award the volume-confirmation point. */
+  minVolumeStrength: number;
 }
 
 export type DeepPartial<T> = {

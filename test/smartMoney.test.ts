@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_CONFIG } from '../src/config/defaults';
-import { findFVGs, findInverseFVGs, findOrderBlocks } from '../src/smartMoney';
+import { findBreakerBlocks, findFVGs, findInverseFVGs, findOrderBlocks } from '../src/smartMoney';
 import { SwingPoint } from '../src/types';
 import { candle } from './helpers';
 
@@ -174,5 +174,78 @@ describe('findOrderBlocks', () => {
     });
 
     expect(obs).toHaveLength(0);
+  });
+});
+
+describe('findBreakerBlocks', () => {
+  it('flips a bullish order block to a bearish breaker once price closes below its bottom', () => {
+    const candles = [
+      candle(0, 5, 5, 4, 4.5), // swing low candle
+      candle(1, 10, 11, 9, 9), // down-close candle -> bullish OB (top=11, bottom=9)
+      candle(2, 9, 12, 9.5, 12), // swing high candle
+      candle(3, 9.5, 9.5, 8, 8.5), // closes (8.5) decisively below bottom(9) -> breaker
+    ];
+
+    const swings: SwingPoint[] = [
+      { index: 0, time: 0, price: 4.5, type: 'low' },
+      { index: 2, time: 2, price: 12, type: 'high' },
+    ];
+
+    const obs = findOrderBlocks(candles, swings, DEFAULT_CONFIG.orderBlock);
+    const breakers = findBreakerBlocks(candles, obs);
+
+    expect(breakers).toHaveLength(1);
+    expect(breakers[0]).toMatchObject({
+      index: 1,
+      type: 'bearish',
+      originalType: 'bullish',
+      top: 11,
+      bottom: 9,
+      breakIndex: 3,
+    });
+  });
+
+  it('flips a bearish order block to a bullish breaker once price closes above its top', () => {
+    const candles = [
+      candle(0, 12, 13, 12, 12.5), // swing high candle
+      candle(1, 9, 10, 9, 10), // up-close candle -> bearish OB (top=10, bottom=9)
+      candle(2, 9.5, 9.5, 7, 7.5), // swing low candle
+      candle(3, 9.8, 10.6, 9.8, 10.5), // closes (10.5) decisively above top(10) -> breaker
+    ];
+
+    const swings: SwingPoint[] = [
+      { index: 0, time: 0, price: 12.5, type: 'high' },
+      { index: 2, time: 2, price: 7.5, type: 'low' },
+    ];
+
+    const obs = findOrderBlocks(candles, swings, DEFAULT_CONFIG.orderBlock);
+    const breakers = findBreakerBlocks(candles, obs);
+
+    expect(breakers).toHaveLength(1);
+    expect(breakers[0]).toMatchObject({
+      index: 1,
+      type: 'bullish',
+      originalType: 'bearish',
+      top: 10,
+      bottom: 9,
+      breakIndex: 3,
+    });
+  });
+
+  it('returns nothing when price never closes through the far edge', () => {
+    const candles = [
+      candle(0, 5, 5, 4, 4.5),
+      candle(1, 10, 11, 9, 9),
+      candle(2, 9, 12, 9.5, 12),
+      candle(3, 9.5, 9.5, 8.5, 9.2), // wicks near the bottom but closes above it
+    ];
+
+    const swings: SwingPoint[] = [
+      { index: 0, time: 0, price: 4.5, type: 'low' },
+      { index: 2, time: 2, price: 12, type: 'high' },
+    ];
+
+    const obs = findOrderBlocks(candles, swings, DEFAULT_CONFIG.orderBlock);
+    expect(findBreakerBlocks(candles, obs)).toEqual([]);
   });
 });

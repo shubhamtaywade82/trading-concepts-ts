@@ -71,6 +71,25 @@ export interface OrderBlock {
   strength: number;
 }
 
+/**
+ * An Order Block that price has closed all the way through, flipping its
+ * role: a bullish OB (former support) that's decisively closed below acts as
+ * bearish resistance going forward, and vice versa. `type` reflects the
+ * *new* (post-break) direction; `originalType` records what it was before.
+ * This is a stronger condition than `OrderBlock.mitigated` (a wick touching
+ * the near edge) — a breaker requires a close beyond the *far* edge.
+ */
+export interface BreakerBlock {
+  index: number;
+  time: number;
+  type: ZoneDirection;
+  originalType: ZoneDirection;
+  top: number;
+  bottom: number;
+  breakIndex: number;
+  breakTime: number;
+}
+
 export type LiquidityType = 'buyside' | 'sellside';
 
 /**
@@ -145,6 +164,20 @@ export interface KillzoneSignal {
   weight: number;
 }
 
+/**
+ * A liquidity sweep that resolved as a reversal within the opening window of
+ * a kill zone — a false move ("Judas Swing") designed to trap breakout
+ * traders before the real directional move. `direction` is the direction of
+ * the expected reversal (a sellside sweep implies a bullish reversal).
+ */
+export interface JudasSwingSignal {
+  zoneIndex: number;
+  sweepIndex: number;
+  time: number;
+  session: string;
+  direction: ZoneDirection;
+}
+
 export interface ConfluenceSignal {
   zoneIndex: number;
   zoneLevel: { top: number; bottom: number };
@@ -185,6 +218,8 @@ export interface HTFContext {
   orderBlocks?: OrderBlock[];
   structure?: StructureSignal[];
   premiumDiscountZones?: PremiumDiscountZone[];
+  /** Unswept HTF liquidity pools, used for the checklist score's "draw on liquidity" factor. */
+  liquidity?: LiquidityZone[];
 }
 
 export interface ConfluenceScoreBreakdown {
@@ -207,14 +242,44 @@ export interface ConfluenceScore {
   breakdown: ConfluenceScoreBreakdown;
 }
 
+/**
+ * The literal 8-point binary checklist: each factor is worth exactly one
+ * point (true/false), independent of the weighted `ConfluenceScore` engine.
+ * See `scoreChecklist`.
+ */
+export interface ChecklistBreakdown {
+  htfDrawOnLiquidity: boolean;
+  premiumDiscountAlignment: boolean;
+  poiQuality: boolean;
+  volumeConfirmation: boolean;
+  killzoneTiming: boolean;
+  liquiditySweep: boolean;
+  structuralShift: boolean;
+  oteEntry: boolean;
+}
+
+export interface ChecklistScore {
+  zoneIndex: number;
+  direction: ZoneDirection;
+  points: number;
+  maxPoints: number;
+  /** `points >= config.validThreshold` (default 6/8). */
+  valid: boolean;
+  /** `points >= config.aPlusThreshold` (default 8/8). */
+  aPlusSetup: boolean;
+  breakdown: ChecklistBreakdown;
+}
+
 export interface AnalysisResult {
   swings: SwingPoint[];
   structure: StructureSignal[];
   fvgs: FVG[];
   inverseFvgs: InverseFVG[];
   orderBlocks: OrderBlock[];
+  breakerBlocks: BreakerBlock[];
   liquidity: LiquidityZone[];
   liquiditySweepScores: LiquiditySweepScore[];
+  judasSwings: JudasSwingSignal[];
   priceAction: PriceActionSignal[];
   killzones: KillzoneSignal[];
   premiumDiscountZones: PremiumDiscountZone[];

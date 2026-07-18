@@ -6,4 +6,5 @@ export * from './liquidity';
 export * from './priceAction';
 export * from './ict';
 export * from './confluenceScore';
+export * from './checklistScore';
 export * from './TradingConcepts';

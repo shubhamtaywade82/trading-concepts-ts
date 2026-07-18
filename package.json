@@ -56,6 +56,8 @@
     "example:forex": "tsx examples/forex.ts",
     "example:index": "tsx examples/nse-index.ts",
     "example:backtest": "tsx examples/backtest.ts",
+    "example:killzone-polarity-shift": "tsx examples/killzone-polarity-shift.ts",
+    "example:htf-accumulation-expansion": "tsx examples/htf-accumulation-expansion.ts",
     "typecheck": "tsc --noEmit",
     "prepare": "husky",
     "prepublishOnly": "npm run build"

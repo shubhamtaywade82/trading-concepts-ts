@@ -3,7 +3,7 @@
  */
 
 import { FVGConfig, OrderBlockConfig } from './config/types';
-import { Candle, FVG, InverseFVG, OrderBlock, SwingPoint } from './types';
+import { BreakerBlock, Candle, FVG, InverseFVG, OrderBlock, SwingPoint } from './types';
 import { average, percentDiff } from './utils/math';
 
 export function findFVGs(candles: Candle[], config: FVGConfig): FVG[] {
@@ -191,4 +191,51 @@ export function findOrderBlocks(
   }
 
   return obs.sort((a, b) => a.index - b.index);
+}
+
+/**
+ * Detects Breaker Blocks: order blocks that price has decisively closed all
+ * the way through, flipping their role — a bullish OB (former support) that's
+ * closed below acts as bearish resistance going forward, and vice versa.
+ * Stronger than `OrderBlock.mitigated` (a wick touching the near edge); a
+ * breaker requires a close beyond the *far* edge.
+ */
+export function findBreakerBlocks(candles: Candle[], orderBlocks: OrderBlock[]): BreakerBlock[] {
+  const breakers: BreakerBlock[] = [];
+
+  for (const ob of orderBlocks) {
+    for (let i = ob.index + 1; i < candles.length; i++) {
+      const c = candles[i];
+
+      if (ob.type === 'bullish' && c.close < ob.bottom) {
+        breakers.push({
+          index: ob.index,
+          time: ob.time,
+          type: 'bearish',
+          originalType: 'bullish',
+          top: ob.top,
+          bottom: ob.bottom,
+          breakIndex: i,
+          breakTime: c.time,
+        });
+        break;
+      }
+
+      if (ob.type === 'bearish' && c.close > ob.top) {
+        breakers.push({
+          index: ob.index,
+          time: ob.time,
+          type: 'bullish',
+          originalType: 'bearish',
+          top: ob.top,
+          bottom: ob.bottom,
+          breakIndex: i,
+          breakTime: c.time,
+        });
+        break;
+      }
+    }
+  }
+
+  return breakers;
 }

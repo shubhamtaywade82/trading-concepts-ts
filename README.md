@@ -19,21 +19,24 @@ git submodule/plugin.
 - **Market structure** — swing highs/lows, Break of Structure (BOS), Change of
   Character (CHoCH), and displacement-confirmed Market Structure Shift (MSS)
 - **Smart money zones** — Fair Value Gaps (FVG) and Order Blocks with
-  mitigation tracking, plus Inverse FVG (IFVG) detection for gaps that flip
-  polarity once price closes through them
+  mitigation tracking, plus Inverse FVG (IFVG) and Breaker Block detection for
+  zones that flip polarity once price closes through them
 - **Liquidity** — equal highs/lows (resting liquidity pools), sweep detection
-  classified as reversal (stop hunt) vs. breakthrough, and a 0-100 sweep
-  quality score
+  classified as reversal (stop hunt) vs. breakthrough, a 0-100 sweep quality
+  score, and named Judas Swing detection (a reversal sweep in a kill zone's
+  opening minutes)
 - **Premium/discount & OTE zones** — Fibonacci equilibrium and Optimal Trade
   Entry (61.8%-79%) bands over swing-to-swing dealing ranges
 - **Price action** — engulfing candles, hammers, shooting stars
 - **ICT killzones** — configurable, weighted session windows (Asian/London/New
   York/London Close, plus a Silver Bullet preset), fine-tunable to any
   exchange's local time
-- **7-pillar confluence engine** — a weighted 0-100 score per unmitigated order
-  block combining structure, liquidity, zone positioning, FVGs, session
-  timing, and price action, with an optional higher-timeframe alignment bonus;
-  plus the original simple long/short pairing for lighter use cases
+- **Two independent scoring systems** — a 7-pillar weighted 0-100 confluence
+  engine, and a separate literal 8-point binary checklist; plus the original
+  simple long/short price-action pairing for lighter use cases
+- **Multi-timeframe composition** — chain `setHTFContext` across HTF → MTF →
+  LTF `TradingConcepts` instances (three tiers, not just one bonus) to build a
+  full top-down bias → POI → trigger pipeline
 - **Fully fine-tunable** — one config object controls every detector; ships
   with ready-made presets for crypto, forex, and equity/index markets, and
   supports layering your own overrides per exchange, market, or symbol
@@ -151,8 +154,8 @@ Both calls invalidate the internal cache so the next `.analyze()` recomputes
 from scratch; nothing recomputes until you call `.analyze()`.
 
 See `src/config/types.ts` for the full list of tunable fields, and
-`examples/` for four complete, runnable setups (crypto, forex, NSE index,
-backtest).
+`examples/` for six complete, runnable setups (crypto, forex, NSE index,
+backtest, and two multi-timeframe strategy demos).
 
 ## The 7-pillar confluence framework
 
@@ -257,6 +260,117 @@ import { createConfig, DEFAULT_CONFIG, FOREX_PRESET, SILVER_BULLET_PRESET } from
 const config = createConfig(createConfig(DEFAULT_CONFIG, FOREX_PRESET), SILVER_BULLET_PRESET);
 ```
 
+### Breaker Blocks
+
+An Order Block that price _closes_ all the way through (not just wicks into)
+flips role — a bullish OB (former support) that's decisively closed below
+acts as bearish resistance going forward, and vice versa. Same close-through
+condition as Inverse FVG, applied to order blocks instead:
+
+```typescript
+import { findOrderBlocks, findBreakerBlocks } from 'trading-concepts-ts';
+
+const orderBlocks = findOrderBlocks(candles, swings, config.orderBlock);
+const breakerBlocks = findBreakerBlocks(candles, orderBlocks); // also in analysis.breakerBlocks
+```
+
+Toggle with `config.orderBlock.breaker.enabled` (default on).
+
+### Judas Swing
+
+A liquidity sweep that resolves as a `reversal` within the opening minutes of
+a kill zone — a false move designed to trap breakout traders before the real
+directional move for the session:
+
+```typescript
+import { findJudasSwings } from 'trading-concepts-ts';
+
+const judasSwings = findJudasSwings(candles, analysis.liquidity, config.session, config.judasSwing);
+// also in analysis.judasSwings; config.judasSwing.openingWindowMinutes defaults to 30
+```
+
+## Multi-timeframe: HTF -> MTF -> LTF
+
+The framework's real structure is three tiers, not just an HTF bonus: an HTF
+sets the bias/POI target, an MTF holds the point of interest, and an LTF
+provides the entry trigger. `setHTFContext` generalizes to any pair of
+adjacent timeframes, so you chain it twice:
+
+```typescript
+const htf = new TradingConcepts(dailyCandles);
+const htfAnalysis = htf.analyze();
+
+const mtf = new TradingConcepts(hourlyCandles);
+mtf.setHTFContext({
+  orderBlocks: htfAnalysis.orderBlocks.filter((ob) => !ob.mitigated),
+  structure: htfAnalysis.structure,
+  premiumDiscountZones: htfAnalysis.premiumDiscountZones,
+  liquidity: htfAnalysis.liquidity.filter((z) => !z.swept),
+});
+const mtfAnalysis = mtf.analyze(); // this HTF bonus reflects the daily picture
+
+const ltf = new TradingConcepts(fifteenMinuteCandles);
+ltf.setHTFContext({
+  orderBlocks: mtfAnalysis.orderBlocks.filter((ob) => !ob.mitigated),
+  structure: mtfAnalysis.structure,
+  premiumDiscountZones: mtfAnalysis.premiumDiscountZones,
+  liquidity: mtfAnalysis.liquidity.filter((z) => !z.swept),
+});
+const ltfAnalysis = ltf.analyze(); // this HTF bonus reflects the hourly picture, one tier down
+```
+
+No dedicated orchestration class — three `TradingConcepts` instances and two
+`setHTFContext` calls _is_ the pattern. `examples/killzone-polarity-shift.ts`
+(Daily → 1H → 15m, an intraday setup built around a Judas Swing) and
+`examples/htf-accumulation-expansion.ts` (Weekly → 4H → 1H, a swing setup
+built around an MSS + FVG continuation) both wire this up in full, using
+`aggregateCandles` (see `examples/generateCandles.ts`) to derive all three
+timeframes from one consistent base series so their zones actually line up.
+
+## The 8-point checklist (alternative scorer)
+
+A second, independent scoring system alongside the weighted 7-pillar engine:
+a literal binary checklist where each of 8 factors is worth exactly one point.
+Some research on this framework presents it this way instead of a weighted
+score, so it's here as its own function — pick whichever model fits how you
+think about a setup; they don't share state or config.
+
+| #   | Factor                     | Point awarded when...                                                           |
+| --- | -------------------------- | ------------------------------------------------------------------------------- |
+| 1   | HTF draw on liquidity      | `HTFContext.liquidity` has an unswept pool on the side price is drawn toward    |
+| 2   | Premium/discount alignment | The order block classifies correctly against the HTF (or local) dealing range   |
+| 3   | POI quality                | A supporting FVG, Inverse FVG, or Breaker Block sits near the order block       |
+| 4   | Volume confirmation        | The order block's volume strength is at least `config.minVolumeStrength` (1.5x) |
+| 5   | Kill zone timing           | The order block formed inside a kill zone window                                |
+| 6   | Liquidity sweep            | A Judas Swing, or any opposite-side swept liquidity, occurred nearby            |
+| 7   | LTF structural shift       | A CHoCH or MSS (not a plain BOS) confirms the direction nearby                  |
+| 8   | Optimal Trade Entry (OTE)  | The order block overlaps the local dealing range's 61.8%-79% retracement band   |
+
+```typescript
+import { scoreChecklist, DEFAULT_CHECKLIST_SCORE_CONFIG } from 'trading-concepts-ts';
+
+const scores = scoreChecklist(
+  {
+    orderBlocks: analysis.orderBlocks,
+    breakerBlocks: analysis.breakerBlocks,
+    structure: analysis.structure,
+    liquidity: analysis.liquidity,
+    judasSwings: analysis.judasSwings,
+    fvgs: analysis.fvgs,
+    inverseFvgs: analysis.inverseFvgs,
+    killzones: analysis.killzones,
+    premiumDiscountZones: analysis.premiumDiscountZones,
+  },
+  DEFAULT_CHECKLIST_SCORE_CONFIG, // validThreshold: 6, aPlusThreshold: 8
+  htfContext, // optional — enables factor 1 and prefers HTF zones for factor 2
+);
+// each entry: { zoneIndex, direction, points, maxPoints: 8, valid, aPlusSetup, breakdown }
+```
+
+Not auto-computed by `analyze()` — call it yourself with that analysis's
+output, as shown above, so the default `AnalysisResult` stays lean for
+consumers who only want one scoring model.
+
 ## Supplying data this library can't compute
 
 Two pieces of the framework in the original research (CVD/order-flow
@@ -298,13 +412,16 @@ ltf.setHTFContext({
   orderBlocks: htfAnalysis.orderBlocks.filter((ob) => !ob.mitigated),
   structure: htfAnalysis.structure,
   premiumDiscountZones: htfAnalysis.premiumDiscountZones,
+  liquidity: htfAnalysis.liquidity.filter((z) => !z.swept), // unswept HTF pools, for the checklist's "draw on liquidity" factor
 });
 
 const analysis = ltf.analyze(); // confluenceScores now include the HTF bonus
 ```
 
 `HTFContext`'s fields are all optional — supply whichever you have; the score
-simply skips the HTF bonus for fields you don't provide.
+simply skips the HTF bonus for fields you don't provide. See "Multi-timeframe:
+HTF -> MTF -> LTF" above for chaining this across three tiers instead of just
+one HTF bonus.
 
 ## Backtesting
 
@@ -363,10 +480,11 @@ class TradingConcepts {
 ```
 
 `AnalysisResult` contains `swings`, `structure` (BOS/CHoCH/MSS), `fvgs`,
-`inverseFvgs`, `orderBlocks`, `liquidity`, `liquiditySweepScores`,
-`priceAction`, `killzones`, `premiumDiscountZones`,
-`signals: { longs, shorts }` (the original simple confluence pairing), and
-`confluenceScores` (the 7-pillar scoring engine).
+`inverseFvgs`, `orderBlocks`, `breakerBlocks`, `liquidity`,
+`liquiditySweepScores`, `judasSwings`, `priceAction`, `killzones`,
+`premiumDiscountZones`, `signals: { longs, shorts }` (the original simple
+confluence pairing), and `confluenceScores` (the 7-pillar scoring engine —
+the separate 8-point `scoreChecklist` is not included here, see above).
 
 Every detector is also exported standalone for tree-shaken, à la carte usage:
 
@@ -378,14 +496,18 @@ import {
   findFVGs,
   findInverseFVGs,
   findOrderBlocks,
+  findBreakerBlocks,
   findLiquidityZones,
   scoreLiquiditySweep,
+  findJudasSwings,
   detectPriceAction,
   detectKillzones,
+  getActiveWindowProgress,
   findDealingRanges,
   computePremiumDiscountZones,
   classifyPrice,
   scoreConfluence,
+  scoreChecklist,
 } from 'trading-concepts-ts';
 ```
 
@@ -416,7 +538,8 @@ npm run lint:fix
 npm run format               # prettier --write .
 npm run format:check
 npm run audit                # audit-ci: fails on high/critical prod-dep advisories
-npm run example:crypto       # or example:forex / example:index / example:backtest
+npm run example:crypto       # or example:forex / example:index / example:backtest /
+                              # example:killzone-polarity-shift / example:htf-accumulation-expansion
 ```
 
 ### Commit convention & pre-commit hooks
@@ -463,16 +586,19 @@ src/
   types.ts                    shared data structures (Candle, SwingPoint, FVG, ConfluenceScore, HTFContext, ...)
   config/                      config types, defaults, market + Silver Bullet presets, deep-merge helper
   marketStructure.ts           swing points, BOS/CHoCH, MSS displacement classification
-  smartMoney.ts                 order blocks, fair value gaps, Inverse FVGs
+  smartMoney.ts                 order blocks, fair value gaps, Inverse FVGs, Breaker Blocks
   liquidity.ts                  equal highs/lows, sweeps (reversal/breakthrough), sweep quality score
   priceAction.ts                 candlestick patterns
   ict/killzones.ts               session/killzone tagging (weighted)
   ict/premiumDiscount.ts          dealing ranges, premium/discount/equilibrium, OTE zones
+  ict/judasSwing.ts                Judas Swing detection (kill zone opening + reversal sweep)
   confluenceScore.ts               the 7-pillar weighted confluence scoring engine
-  TradingConcepts.ts               main class: wiring + both confluence approaches + HTF context
+  checklistScore.ts                 the independent 8-point binary checklist scorer
+  TradingConcepts.ts               main class: wiring + both scoring systems + HTF context
   index.ts                         public exports
 test/                              vitest unit tests per module
-examples/                          runnable fine-tuning examples (crypto/forex/index) + backtest harness
+examples/                          runnable fine-tuning examples (crypto/forex/index), a backtest
+                                    harness, and two multi-timeframe (HTF/MTF/LTF) strategy demos
 ```
 
 ## Disclaimer

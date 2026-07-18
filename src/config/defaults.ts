@@ -1,4 +1,4 @@
-import { TradingConceptsConfig } from './types';
+import { ChecklistScoreConfig, TradingConceptsConfig } from './types';
 
 /**
  * Baseline configuration. Presets in `presets.ts` layer market/exchange-specific
@@ -28,6 +28,9 @@ export const DEFAULT_CONFIG: TradingConceptsConfig = {
     volumeLookback: 10,
     minVolumeStrength: 0,
     requireVolume: false,
+    breaker: {
+      enabled: true,
+    },
   },
   liquidity: {
     enabled: true,
@@ -53,6 +56,10 @@ export const DEFAULT_CONFIG: TradingConceptsConfig = {
       { name: 'London', startUtcMinute: 420, endUtcMinute: 600, weight: 1 },
       { name: 'NewYork', startUtcMinute: 720, endUtcMinute: 900, weight: 1 },
     ],
+  },
+  judasSwing: {
+    enabled: true,
+    openingWindowMinutes: 30,
   },
   priceAction: {
     enabled: true,
@@ -83,4 +90,15 @@ export const DEFAULT_CONFIG: TradingConceptsConfig = {
       htf: 10,
     },
   },
+};
+
+/**
+ * Default config for the standalone 8-point checklist scorer (`scoreChecklist`).
+ * Independent of `DEFAULT_CONFIG` — pass your own to tune it.
+ */
+export const DEFAULT_CHECKLIST_SCORE_CONFIG: ChecklistScoreConfig = {
+  validThreshold: 6,
+  aPlusThreshold: 8,
+  lookaroundBars: 5,
+  minVolumeStrength: 1.5,
 };
