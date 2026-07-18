@@ -1,0 +1,12 @@
+{
+  // Fails CI on high/critical advisories in production dependencies.
+  // devDependencies are skipped here because dev-only tooling vulnerabilities
+  // (e.g. a bundler's local dev-server) never ship to consumers of this
+  // package; run `npm audit` (no --skip-dev) locally if you want the full picture.
+  "$schema": "https://raw.githubusercontent.com/IBM/audit-ci/main/docs/schema.json",
+  "high": true,
+  "critical": true,
+  "skip-dev": true,
+  "report-type": "important",
+  "allowlist": [],
+}
