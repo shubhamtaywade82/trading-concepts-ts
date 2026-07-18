@@ -45,7 +45,7 @@ jobs:
       - run: npm run test:coverage
       - name: Upload coverage (Node 20 only)
         if: matrix.node-version == '20'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-report
           path: coverage/
@@ -70,7 +70,7 @@ jobs:
           test -f dist/index.d.ts
       - name: Verify package.json exports resolve
         run: node -e "require('./dist/index.cjs'); import('./dist/index.js').then(() => console.log('ESM import OK'))"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: dist
           path: dist/
