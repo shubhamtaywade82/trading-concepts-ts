@@ -37,12 +37,16 @@ git submodule/plugin.
 - **Multi-timeframe composition** — chain `setHTFContext` across HTF → MTF →
   LTF `TradingConcepts` instances (three tiers, not just one bonus) to build a
   full top-down bias → POI → trigger pipeline
+- **Indicator stack** — standalone ATR, Keltner Channels, Bollinger Bands +
+  TTM Squeeze, session-anchored VWAP, and Volume Profile (HVN/LVN/Point of
+  Control), for validating displacement, fair value, and real participation
 - **Fully fine-tunable** — one config object controls every detector; ships
   with ready-made presets for crypto, forex, and equity/index markets, and
   supports layering your own overrides per exchange, market, or symbol
-- **Extensible with your own data** — optional `Candle.delta` (order-flow/CVD)
-  and an `HTFContext` interface let a consuming project feed in data this
-  library can't derive from OHLCV alone (see
+- **Extensible with your own data** — optional `Candle.delta` (order-flow/CVD),
+  an `HTFContext` interface, and Open Interest/funding-rate helpers let a
+  consuming project feed in data this library can't derive from OHLCV alone
+  (see
   [Supplying data this library can't compute](#supplying-data-this-library-cant-compute))
 
 ## Install
@@ -371,13 +375,67 @@ Not auto-computed by `analyze()` — call it yourself with that analysis's
 output, as shown above, so the default `AnalysisResult` stays lean for
 consumers who only want one scoring model.
 
+## Indicator stack (volatility, VWAP, volume profile)
+
+A separate set of standalone, pure-OHLCV indicators — not part of `analyze()`
+or either scoring engine, just exported functions you compose yourself. These
+back the "institutional-grade" checks some SMC/ICT research layers on top of
+the core concepts: is a displacement candle actually large relative to
+recent volatility, does an Order Block sit on real traded volume, is price
+above or below the session's fair-value anchor.
+
+```typescript
+import {
+  calculateATR,
+  calculateKeltnerChannels,
+  calculateBollingerBands,
+  detectTTMSqueeze,
+  calculateVWAP,
+  calculateVolumeProfile,
+} from 'trading-concepts-ts';
+
+// Displacement threshold: is this candle's body >= 1.5x the recent ATR?
+const atr = calculateATR(candles, { period: 14 });
+const displaced = Math.abs(candle.close - candle.open) >= (atr[i] ?? Infinity) * 1.5;
+
+// TTM Squeeze: Bollinger Bands compressed inside Keltner Channels often
+// precedes a displacement move (ICT traders watch for this during the
+// Asian session, ahead of the London kill zone).
+const squeeze = detectTTMSqueeze(candles, {
+  bollinger: { period: 20, stdevMultiplier: 2 },
+  keltner: { emaPeriod: 20, atrPeriod: 14, multiplier: 2 },
+});
+
+// Session VWAP: is price trading above (long bias) or below (short bias) fair value?
+const vwap = calculateVWAP(candles, { resetDaily: true, timezoneOffsetMinutes: 0 });
+
+// Volume Profile: does an Order Block sit on a High Volume Node (real
+// participation) or a Low Volume Node (a likely retail trap / liquidity void)?
+const profile = calculateVolumeProfile(candles, { bins: 24, hvnPercentile: 0.7, lvnPercentile: 0.3 });
+const obOnHvn = profile.highVolumeNodes.some((bin) => bin.priceLow <= ob.top && bin.priceHigh >= ob.bottom);
+```
+
+All four default configs are exported too: `DEFAULT_ATR_CONFIG`,
+`DEFAULT_KELTNER_CONFIG`, `DEFAULT_BOLLINGER_CONFIG`,
+`DEFAULT_TTM_SQUEEZE_CONFIG`, `DEFAULT_VWAP_CONFIG`,
+`DEFAULT_VOLUME_PROFILE_CONFIG`.
+
+**Out of scope**: footprint/cluster charts and bid-ask imbalance need
+per-price executed-volume data that a plain `Candle` (one OHLCV bar) can't
+represent — that requires a footprint/order-book data feed and a different
+data model entirely. Pine Script "auto" indicators (sweep scorers, auto
+OB/FVG drawing, session overlays) are TradingView charting plugins, not a
+concern for an OHLCV analysis library — this library _is_ the auto-detection
+engine; pair it with your own charting layer for the drawing/overlay part.
+
 ## Supplying data this library can't compute
 
-Two pieces of the framework in the original research (CVD/order-flow
-absorption, and higher-timeframe alignment) genuinely can't be derived from a
-single OHLCV series. Rather than fake them, the library exposes typed
-extension points so a consuming project can supply real data when it has it —
-both are entirely optional and everything works without them.
+Three pieces of the framework in the original research (CVD/order-flow
+absorption, higher-timeframe alignment, and derivatives-market data) genuinely
+can't be derived from a single OHLCV series. Rather than fake them, the
+library exposes typed extension points so a consuming project can supply real
+data when it has it — all are entirely optional and everything works without
+them.
 
 **Order-flow delta (CVD)** — if your data source gives you buy/sell volume
 per candle (footprint charts, an exchange trade-tape aggregator, a CVD feed),
@@ -422,6 +480,23 @@ const analysis = ltf.analyze(); // confluenceScores now include the HTF bonus
 simply skips the HTF bonus for fields you don't provide. See "Multi-timeframe:
 HTF -> MTF -> LTF" above for chaining this across three tiers instead of just
 one HTF bonus.
+
+**Open Interest & funding rate** — crypto perpetuals-specific, and entirely
+outside what OHLCV candles can tell you. Pull a time series from your
+exchange's futures API and pass it alongside your structure signals:
+
+```typescript
+import { confirmStructureWithOpenInterest, classifyFundingSkew } from 'trading-concepts-ts';
+
+const derivativesData = await fetchOpenInterestHistory(symbol); // [{ time, openInterest }, ...]
+const confirmations = confirmStructureWithOpenInterest(analysis.structure, derivativesData);
+// a BOS expects OI to have risen beforehand (new money); a CHoCH/MSS expects
+// it to have fallen (existing positions liquidating, not fresh conviction)
+
+const skew = classifyFundingSkew(latestFundingRate); // 'longs_crowded' | 'shorts_crowded' | 'neutral'
+// heavily negative funding -> shorts crowded -> a sweep to the upside (to
+// liquidate them) is more probable than the reverse
+```
 
 ## Backtesting
 
@@ -508,6 +583,14 @@ import {
   classifyPrice,
   scoreConfluence,
   scoreChecklist,
+  calculateATR,
+  calculateKeltnerChannels,
+  calculateBollingerBands,
+  detectTTMSqueeze,
+  calculateVWAP,
+  calculateVolumeProfile,
+  confirmStructureWithOpenInterest,
+  classifyFundingSkew,
 } from 'trading-concepts-ts';
 ```
 
@@ -594,6 +677,8 @@ src/
   ict/judasSwing.ts                Judas Swing detection (kill zone opening + reversal sweep)
   confluenceScore.ts               the 7-pillar weighted confluence scoring engine
   checklistScore.ts                 the independent 8-point binary checklist scorer
+  indicators/                       standalone ATR/Keltner, Bollinger/TTM squeeze, VWAP,
+                                     Volume Profile, and OI/funding-rate helpers
   TradingConcepts.ts               main class: wiring + both scoring systems + HTF context
   index.ts                         public exports
 test/                              vitest unit tests per module

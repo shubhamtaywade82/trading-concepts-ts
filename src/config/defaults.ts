@@ -1,4 +1,13 @@
-import { ChecklistScoreConfig, TradingConceptsConfig } from './types';
+import {
+  ATRConfig,
+  BollingerBandsConfig,
+  ChecklistScoreConfig,
+  KeltnerChannelConfig,
+  TradingConceptsConfig,
+  TTMSqueezeConfig,
+  VolumeProfileConfig,
+  VWAPConfig,
+} from './types';
 
 /**
  * Baseline configuration. Presets in `presets.ts` layer market/exchange-specific
@@ -101,4 +110,35 @@ export const DEFAULT_CHECKLIST_SCORE_CONFIG: ChecklistScoreConfig = {
   aPlusThreshold: 8,
   lookaroundBars: 5,
   minVolumeStrength: 1.5,
+};
+
+export const DEFAULT_ATR_CONFIG: ATRConfig = {
+  period: 14,
+};
+
+export const DEFAULT_KELTNER_CONFIG: KeltnerChannelConfig = {
+  emaPeriod: 20,
+  atrPeriod: 14,
+  multiplier: 2,
+};
+
+export const DEFAULT_BOLLINGER_CONFIG: BollingerBandsConfig = {
+  period: 20,
+  stdevMultiplier: 2,
+};
+
+export const DEFAULT_TTM_SQUEEZE_CONFIG: TTMSqueezeConfig = {
+  bollinger: DEFAULT_BOLLINGER_CONFIG,
+  keltner: DEFAULT_KELTNER_CONFIG,
+};
+
+export const DEFAULT_VWAP_CONFIG: VWAPConfig = {
+  resetDaily: true,
+  timezoneOffsetMinutes: 0,
+};
+
+export const DEFAULT_VOLUME_PROFILE_CONFIG: VolumeProfileConfig = {
+  bins: 24,
+  hvnPercentile: 0.7,
+  lvnPercentile: 0.3,
 };

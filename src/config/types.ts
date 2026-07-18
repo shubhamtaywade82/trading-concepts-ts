@@ -155,6 +155,53 @@ export interface ChecklistScoreConfig {
   minVolumeStrength: number;
 }
 
+/**
+ * Configs below back the standalone indicator functions in `src/indicators/`.
+ * None of these are fields on `TradingConceptsConfig` — they're independent
+ * utilities you compose yourself (see README).
+ */
+
+export interface ATRConfig {
+  /** Bars averaged for the true-range calculation. */
+  period: number;
+}
+
+export interface KeltnerChannelConfig {
+  /** EMA period for the channel midline. */
+  emaPeriod: number;
+  /** ATR period for the channel width. */
+  atrPeriod: number;
+  /** How many ATRs wide the upper/lower bands sit from the midline. */
+  multiplier: number;
+}
+
+export interface BollingerBandsConfig {
+  /** SMA period for the midline. */
+  period: number;
+  /** How many standard deviations wide the upper/lower bands sit from the midline. */
+  stdevMultiplier: number;
+}
+
+export interface TTMSqueezeConfig {
+  bollinger: BollingerBandsConfig;
+  keltner: KeltnerChannelConfig;
+}
+
+export interface VWAPConfig {
+  /** Reset the cumulative sums at each new trading day (00:00 local, per `timezoneOffsetMinutes`). */
+  resetDaily: boolean;
+  timezoneOffsetMinutes: number;
+}
+
+export interface VolumeProfileConfig {
+  /** Number of equal-height price bins spanning the candle range. */
+  bins: number;
+  /** Bins at/above this volume percentile (0-1) are classified as High Volume Nodes. */
+  hvnPercentile: number;
+  /** Bins at/below this volume percentile (0-1) are classified as Low Volume Nodes. */
+  lvnPercentile: number;
+}
+
 export type DeepPartial<T> = {
   [P in keyof T]?: T[P] extends Array<infer U> ? Array<U> : T[P] extends object ? DeepPartial<T[P]> : T[P];
 };

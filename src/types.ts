@@ -289,3 +289,56 @@ export interface AnalysisResult {
   };
   confluenceScores: ConfluenceScore[];
 }
+
+/**
+ * Indicator utilities below (ATR, Keltner, Bollinger/TTM squeeze, VWAP,
+ * Volume Profile, and the OI/funding-rate extension) are standalone — they
+ * are not part of `AnalysisResult` or either scoring engine. Compose them
+ * yourself; see the README's indicator stack section.
+ */
+
+/** A single band-indicator reading (Keltner Channel or Bollinger Bands). */
+export interface BandValue {
+  middle: number;
+  upper: number;
+  lower: number;
+}
+
+export type VolumeNodeClassification = 'hvn' | 'lvn' | 'neutral';
+
+export interface VolumeProfileBin {
+  priceLow: number;
+  priceHigh: number;
+  volume: number;
+  classification: VolumeNodeClassification;
+}
+
+export interface VolumeProfile {
+  bins: VolumeProfileBin[];
+  pointOfControl: VolumeProfileBin;
+  highVolumeNodes: VolumeProfileBin[];
+  lowVolumeNodes: VolumeProfileBin[];
+}
+
+/**
+ * Open Interest / funding rate for one point in time, supplied by a
+ * consuming project from its own exchange/derivatives feed — this library
+ * cannot derive either from OHLCV candles. Both fields are optional so you
+ * can supply just the one you have.
+ */
+export interface DerivativesDataPoint {
+  time: number;
+  openInterest?: number;
+  fundingRate?: number;
+}
+
+export interface OpenInterestConfirmation {
+  signalIndex: number;
+  expectedDirection: 'increase' | 'decrease';
+  /** `null` when there isn't enough surrounding OI data to compute a change. */
+  actualChangePercent: number | null;
+  confirmed: boolean;
+}
+
+/** Which side is crowded, per funding-rate sign/magnitude — the crowded side is the one more likely to get swept. */
+export type FundingSkew = 'longs_crowded' | 'shorts_crowded' | 'neutral';

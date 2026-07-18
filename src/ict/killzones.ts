@@ -7,13 +7,7 @@
 
 import { SessionConfig } from '../config/types';
 import { Candle, KillzoneSignal, KillzoneWindow } from '../types';
-
-const MINUTES_PER_DAY = 1440;
-
-function minuteOfDay(timeMs: number, offsetMinutes: number): number {
-  const shifted = Math.floor(timeMs / 60000) + offsetMinutes;
-  return ((shifted % MINUTES_PER_DAY) + MINUTES_PER_DAY) % MINUTES_PER_DAY;
-}
+import { MINUTES_PER_DAY, minuteOfDay } from '../utils/time';
 
 function isWithinWindow(minute: number, startUtcMinute: number, endUtcMinute: number): boolean {
   if (startUtcMinute <= endUtcMinute) {
