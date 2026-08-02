@@ -60,7 +60,7 @@
     "example:htf-accumulation-expansion": "tsx examples/htf-accumulation-expansion.ts",
     "example:llm-context": "tsx examples/llm-context.ts",
     "typecheck": "tsc --noEmit",
-    "prepare": "husky",
+    "prepare": "husky 2>/dev/null; npm run build",
     "prepublishOnly": "npm run build"
   },
   "devDependencies": {
